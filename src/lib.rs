@@ -17,13 +17,13 @@ use typenum::uint::UInt;
 use generic_array::{ArrayLength, GenericArray};
 
 pub trait BitValuable {
-    type MaxBitDiv64: ArrayLength<usize>;
+    type ArrLen: ArrayLength<usize>;
     fn bit_value(&self) -> usize;
     fn from_bit_value(bit_value: usize) -> Self;
 }
 
 pub struct BitSet<T: BitValuable> {
-    arr: GenericArray<usize, <T as BitValuable>::MaxBitDiv64>,
+    arr: GenericArray<usize, <T as BitValuable>::ArrLen>,
     len: usize,
 }
 
