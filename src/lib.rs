@@ -17,6 +17,7 @@ use typenum::uint::UInt;
 use generic_array::{ArrayLength, GenericArray};
 
 pub trait BitValuable {
+    type MaxBit: Unsigned;
     type ArrLen: ArrayLength<usize>;
     fn bit_value(&self) -> usize;
     fn from_bit_value(bit_value: usize) -> Self;
@@ -105,12 +106,13 @@ impl<T: BitValuable> BitSet<T> {
         self.len -= 1;
     }
 
-    pub fn max_allowed_bit_value(&self) -> usize {
-        self.arr.len() * 64 - 1
+    pub fn max_allowed_bit_value() -> usize {
+        <T::MaxBit as Unsigned>::to_usize()
+        // self.arr.len() * 64 - 1
     }
 
     fn check_bit_value(&self, bit_value: usize) {
-        let max_allowed = self.max_allowed_bit_value();
+        let max_allowed = Self::max_allowed_bit_value();
         if bit_value > max_allowed {
             panic!(
                 "Tried to perform operation with value having bit_value of {}. Max bit_value is {}",
