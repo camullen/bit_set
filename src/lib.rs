@@ -10,7 +10,8 @@ extern crate std;
 
 
 
-
+use core::marker::PhantomData;
+use core::iter::FromIterator;
 
 extern crate generic_array;
 extern crate typenum;
@@ -27,6 +28,34 @@ pub trait BitValuable {
     fn from_bit_value(bit_value: usize) -> Self;
 }
 
+impl BitValuable for u8 {
+    type MaxBit = U255;
+    type ArrLen = U4;
+
+    fn bit_value(&self) -> usize {
+        *self as usize
+    }
+
+    fn from_bit_value(bit_value: usize) -> u8 {
+        bit_value as u8
+    }
+}
+
+impl BitValuable for i8 {
+    type MaxBit = U255;
+    type ArrLen = U4;
+
+    fn bit_value(&self) -> usize {
+        *self as usize
+    }
+
+    fn from_bit_value(bit_value: usize) -> i8 {
+        bit_value as i8
+    }
+}
+
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct BitSet<T: BitValuable> {
     arr: GenericArray<usize, <T as BitValuable>::ArrLen>,
     len: usize,
@@ -96,6 +125,66 @@ impl<T: BitValuable> BitSet<T> {
         true
     }
 
+    pub fn symmetric_difference(&self, other: &BitSet<T>) -> BitSet<T> {
+        let diff_arr = self.arr.zip_ref(&other.arr, |s, o| *s ^ *o);
+        let diff_len: usize = diff_arr.iter().map(|b| b.count_ones() as usize).sum();
+        BitSet {
+            arr: diff_arr,
+            len: diff_len,
+        }
+    }
+
+    pub fn difference(&self, other: &BitSet<T>) -> BitSet<T> {
+        let diff_arr = self.arr.zip_ref(&other.arr, |s, o| (*s & *o) ^ *s);
+        let diff_len: usize = diff_arr.iter().map(|b| b.count_ones() as usize).sum();
+        BitSet {
+            arr: diff_arr,
+            len: diff_len,
+        }
+    }
+
+    pub fn intersection(&self, other: &BitSet<T>) -> BitSet<T> {
+        let diff_arr = self.arr.zip_ref(&other.arr, |s, o| *s & *o);
+        let diff_len: usize = diff_arr.iter().map(|b| b.count_ones() as usize).sum();
+        BitSet {
+            arr: diff_arr,
+            len: diff_len,
+        }
+    }
+
+    pub fn union(&self, other: &BitSet<T>) -> BitSet<T> {
+        let diff_arr = self.arr.zip_ref(&other.arr, |s, o| *s | *o);
+        let diff_len: usize = diff_arr.iter().map(|b| b.count_ones() as usize).sum();
+        BitSet {
+            arr: diff_arr,
+            len: diff_len,
+        }
+    }
+
+    pub fn is_disjoint(&self, other: &BitSet<T>) -> bool {
+        self.arr
+            .iter()
+            .zip(other.arr.iter())
+            .all(|(s, o)| (*s & *o) == 0)
+    }
+
+    pub fn is_subset(&self, other: &BitSet<T>) -> bool {
+        self.arr
+            .iter()
+            .zip(other.arr.iter())
+            .all(|(s, o)| (*s & *o) == *s)
+    }
+
+    pub fn is_superset(&self, other: &BitSet<T>) -> bool {
+        self.arr
+            .iter()
+            .zip(other.arr.iter())
+            .all(|(s, o)| (*s & *o) == *o)
+    }
+
+    pub fn iter(&self) -> BitSetIterator<core::slice::Iter<usize>, T> {
+        BitSetIterator::new(self.arr.iter())
+    }
     fn contains_entry(&self, entry: &BitEntry) -> bool {
         (self.arr[entry.index] & entry.bitmask) != 0
     }
@@ -126,6 +215,79 @@ impl<T: BitValuable> BitSet<T> {
     }
 }
 
+impl<'a, T> IntoIterator for &'a BitSet<T>
+where
+    T: BitValuable,
+{
+    type Item = T;
+    type IntoIter = BitSetIterator<'a, core::slice::Iter<'a, usize>, T>;
+    fn into_iter(self) -> BitSetIterator<'a, core::slice::Iter<'a, usize>, T> {
+        self.iter()
+    }
+}
+
+impl<T> FromIterator<T> for BitSet<T>
+where
+    T: BitValuable,
+{
+    fn from_iter<I>(iter: I) -> BitSet<T>
+    where
+        I: IntoIterator<Item = T>,
+    {
+        let mut set = BitSet::new();
+        for i in iter {
+            set.insert(&i);
+        }
+        set
+    }
+}
+
+impl<'a, T> FromIterator<&'a T> for BitSet<T>
+where
+    T: BitValuable + 'a,
+{
+    fn from_iter<I>(iter: I) -> BitSet<T>
+    where
+        I: IntoIterator<Item = &'a T>,
+    {
+        let mut set = BitSet::new();
+        for i in iter {
+            set.insert(i);
+        }
+        set
+    }
+}
+
+
+impl<T> Extend<T> for BitSet<T>
+where
+    T: BitValuable,
+{
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = T>,
+    {
+        for i in iter {
+            self.insert(&i);
+        }
+    }
+}
+
+
+impl<'a, T> Extend<&'a T> for BitSet<T>
+where
+    T: BitValuable + 'a,
+{
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = &'a T>,
+    {
+        for i in iter {
+            self.insert(i);
+        }
+    }
+}
+
 impl<T> Default for BitSet<T>
 where
     T: BitValuable,
@@ -134,6 +296,43 @@ where
         Self::new()
     }
 }
+
+pub struct BitSetIterator<'a, I, T>
+where
+    I: Iterator<Item = &'a usize>,
+    T: BitValuable,
+{
+    multi_obp_iter: MultiOneBitsPositionIterator<'a, I>,
+    _phantom: PhantomData<T>,
+}
+
+impl<'a, I, T> Iterator for BitSetIterator<'a, I, T>
+where
+    I: Iterator<Item = &'a usize>,
+    T: BitValuable,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        self.multi_obp_iter
+            .next()
+            .map(<T as BitValuable>::from_bit_value)
+    }
+}
+
+impl<'a, I, T> BitSetIterator<'a, I, T>
+where
+    I: Iterator<Item = &'a usize>,
+    T: BitValuable,
+{
+    fn new(iter: I) -> BitSetIterator<'a, I, T> {
+        BitSetIterator {
+            multi_obp_iter: MultiOneBitsPositionIterator::new(iter),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+
 
 pub struct ZeroBitsIntervalIterator(usize);
 
@@ -175,20 +374,20 @@ impl Iterator for OneBitsPositionIterator {
 }
 
 
-pub struct MultiOneBitsPositionIterator<T>
+pub struct MultiOneBitsPositionIterator<'a, T>
 where
-    T: Iterator<Item = usize>,
+    T: Iterator<Item = &'a usize>,
 {
     iter: T,
     obp_iter: Option<OneBitsPositionIterator>,
     base: usize,
 }
 
-impl<T> MultiOneBitsPositionIterator<T>
+impl<'a, T> MultiOneBitsPositionIterator<'a, T>
 where
-    T: Iterator<Item = usize>,
+    T: Iterator<Item = &'a usize>,
 {
-    pub fn new(iter: T) -> MultiOneBitsPositionIterator<T> {
+    pub fn new(iter: T) -> MultiOneBitsPositionIterator<'a, T> {
         MultiOneBitsPositionIterator {
             iter,
             obp_iter: None,
@@ -197,9 +396,9 @@ where
     }
 }
 
-impl<T> Iterator for MultiOneBitsPositionIterator<T>
+impl<'a, T> Iterator for MultiOneBitsPositionIterator<'a, T>
 where
-    T: Iterator<Item = usize>,
+    T: Iterator<Item = &'a usize>,
 {
     type Item = usize;
     fn next(&mut self) -> Option<usize> {
@@ -212,7 +411,7 @@ where
             match self.iter.next() {
                 None => return None,
                 Some(next_usize) => {
-                    self.obp_iter = Some(OneBitsPositionIterator::new(next_usize));
+                    self.obp_iter = Some(OneBitsPositionIterator::new(*next_usize));
                     self.base += 64
                 }
             }
@@ -325,4 +524,38 @@ mod tests {
         assert!(actual.is_empty())
     }
 
+    #[test]
+    fn bitset_smoke_test() {
+        let insert: u8 = 120;
+        let mut bit_set = BitSet::new();
+        assert!(bit_set.is_empty());
+        assert_eq!(0, bit_set.len());
+        assert!(!bit_set.contains(&insert));
+
+        let insert_res = bit_set.insert(&insert);
+
+        assert!(insert_res);
+        assert!(!bit_set.is_empty());
+        assert_eq!(1, bit_set.len());
+        assert!(bit_set.contains(&insert));
+
+        let dup_insert_res = bit_set.insert(&insert);
+
+        assert!(!dup_insert_res);
+        assert!(!bit_set.is_empty());
+        assert_eq!(1, bit_set.len());
+        assert!(bit_set.contains(&insert));
+
+        let remove_res = bit_set.remove(&insert);
+        assert!(remove_res);
+        assert!(bit_set.is_empty());
+        assert_eq!(0, bit_set.len());
+        assert!(!bit_set.contains(&insert));
+
+        let dup_remove_res = bit_set.remove(&insert);
+        assert!(!dup_remove_res);
+        assert!(bit_set.is_empty());
+        assert_eq!(0, bit_set.len());
+        assert!(!bit_set.contains(&insert));
+    }
 }
