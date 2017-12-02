@@ -1,8 +1,16 @@
+// Setup clippy
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
 #![no_std]
 
+// Use std for testing purposes
 #[cfg(test)]
 #[macro_use]
 extern crate std;
+
+
+
+
 
 extern crate generic_array;
 extern crate typenum;
@@ -118,6 +126,15 @@ impl<T: BitValuable> BitSet<T> {
     }
 }
 
+impl<T> Default for BitSet<T>
+where
+    T: BitValuable,
+{
+    fn default() -> BitSet<T> {
+        Self::new()
+    }
+}
+
 pub struct ZeroBitsIntervalIterator(usize);
 
 impl Iterator for ZeroBitsIntervalIterator {
@@ -127,7 +144,7 @@ impl Iterator for ZeroBitsIntervalIterator {
             return None;
         }
         let tz = self.0.trailing_zeros();
-        self.0 = self.0 >> (tz + 1);
+        self.0 >>= tz + 1;
         Some(tz as usize)
     }
 }
