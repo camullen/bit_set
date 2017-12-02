@@ -1,19 +1,15 @@
-// #![no_std]
+#![no_std]
 
-// #[cfg(test)]
-// #[macro_use]
-// extern crate std;
-
+#[cfg(test)]
 #[macro_use]
-extern crate typenum;
+extern crate std;
 
-#[macro_use]
 extern crate generic_array;
+extern crate typenum;
 
 pub use typenum::consts::*;
 pub use typenum::marker_traits::Unsigned;
 
-use typenum::uint::UInt;
 use generic_array::{ArrayLength, GenericArray};
 
 pub trait BitValuable {
@@ -102,13 +98,12 @@ impl<T: BitValuable> BitSet<T> {
     }
 
     fn remove_entry(&mut self, entry: &BitEntry) {
-        self.arr[entry.index] &= (!entry.bitmask);
+        self.arr[entry.index] &= !entry.bitmask;
         self.len -= 1;
     }
 
     pub fn max_allowed_bit_value() -> usize {
         <T::MaxBit as Unsigned>::to_usize()
-        // self.arr.len() * 64 - 1
     }
 
     fn check_bit_value(&self, bit_value: usize) {
@@ -229,7 +224,7 @@ mod tests {
         let max_pos = positions.iter().max().unwrap();
         let vec_size = (max_pos / 64) + 1;
         let mut usize_vec: Vec<usize> = Vec::with_capacity(vec_size);
-        for n in 0..vec_size {
+        for _n in 0..vec_size {
             usize_vec.push(0);
         }
         for pos in positions.iter() {
