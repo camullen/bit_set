@@ -126,13 +126,10 @@ pub struct ZeroBitsIntervalIterator(usize);
 impl Iterator for ZeroBitsIntervalIterator {
     type Item = usize;
     fn next(&mut self) -> Option<usize> {
-        println!("Next iteration. Self = {:b}", self.0);
         if self.0 == 0 {
-            println!("Returning none");
             return None;
         }
         let tz = self.0.trailing_zeros();
-        println!("Trailing zeros = {}", tz);
         self.0 = self.0 >> (tz + 1);
         Some(tz as usize)
     }
@@ -210,114 +207,6 @@ where
 }
 
 
-// struct MapOneBitsPositionIterator<T>
-// where
-// T: Iterator<Item = usize>,
-// {
-// iter: T,
-// }
-
-// impl<T> Iterator for MapOneBitsPositionIterator<T>
-// where
-// T: Iterator<Item = usize>,
-// {
-// type Item = OneBitsPositionIterator;
-// fn next(&mut self) -> Option<OneBitsPositionIterator> {
-// self.iter
-// .next()
-// .map(|next_usize| OneBitsPositionIterator::new(next_usize))
-// }
-// }
-
-
-// struct MultiOneBitsPositionIteratorV<T>
-// where T: Iterator<Item = usize>,
-// {
-// iter: T,
-// obp_iterator: Option<OneBitsPositionIterator>,
-// base: usize,
-// initialized: bool,
-// }
-
-// impl<T> MultiOneBitsPositionIterator<T> {
-// fn new(iter: T) -> MultiOneBitsPositionIterator<T> {
-// MultiOneBitsPositionIterator {
-// iter,
-// obp_iterator: None,
-// base: 0,
-// }
-// }
-// }
-
-// impl<T> Iterator for MultiOneBitsPositionIterator<T> {
-// type Item = usize;
-// fn next(&mut self) -> Option<usize> {
-// self.obp_iterator = self.obp_iterator.or(self.iter.next().map(|usize_input| OneBitsPositionIterator::new(usize_input)));
-// self.obp_iterator.and_then()
-// }
-// }
-
-
-
-// pub struct BitSetIterator<'a, T: BitValuable + 'a> {
-// bit_set: &'a BitSet<T>,
-// curr_block: usize,
-// curr_bit_pos: usize,
-// }
-
-// impl<'a, T: BitValuable + 'a> BitSetIterator<'a, T> {
-// fn new(bit_set: &'a BitSet<T>) -> BitSetIterator<'a, T> {
-// BitSetIterator {
-// bit_set,
-// curr_block: bit_set.arr[0],
-// curr_bit_pos: 0,
-// }
-// }
-
-// fn reset(&mut self) {
-// self.curr_block = bit_set.arr[0];
-// self.curr_bit_pos = 0;
-// self.advance();
-// }
-
-// fn advance(&mut self) {
-// if (self.curr_block & 1) != 0 {
-// return;
-// }
-// self.advance_block();
-// let trailing_zeroes = self.curr_block.trailing_zeroes();
-// self.curr_bit_pos
-// }
-
-// fn advance_block(&mut self) -> bool {
-// if self.curr_block != 0 {
-// return;
-// };
-
-// let mut curr_index = self.curr_bit_pos / 64;
-// let arr_len = self.bit_set.arr.len();
-
-// while(self.curr_block == 0 && curr_index < arr_len) {
-// curr_index += 1;
-// self.curr_block = self.bit_set.arr[curr_index];
-// }
-// self.curr_bit_pos = curr_index * 64;
-// }
-// }
-
-// impl<'a, T: BitValuable + 'a> Iterator for BitSetIterator<'a, T> {
-// type Item = T;
-// fn next(&mut self) -> Option<T> {
-// if(self.curr_block_index >= bit_set.arr.len()) {
-// self.curr_block_index = 0;
-// self.curr_block = bit_set.arr[0];
-// self.curr_bit_pos = 0;
-// return None;
-// }
-// let bit_value = self.curr_bit_pos
-// }
-// }
-
 #[cfg(test)]
 mod tests {
     use std::prelude::v1::*;
@@ -327,16 +216,49 @@ mod tests {
         intervals
             .iter()
             .rev()
-            .fold(0, |acc, &interval| ((acc << 1) | 1) << interval);
+            .fold(0, |acc, &interval| ((acc << 1) | 1) << interval)
+    }
+
+    fn usize_from_positions(positions: &[usize]) -> usize {
+        positions.iter().fold(0, |acc, &pos| acc | (1 << pos))
+    }
+
+    fn usize_vec_from_positions(positions: &[usize]) -> Vec<usize> {
+        let max_pos = positions.iter().max().unwrap();
+        let vec_size = (max_pos / 64) + 1;
+        let mut usize_vec: Vec<usize> = Vec::with_capacity(vec_size);
+        for n in 0..vec_size {
+            usize_vec.push(0);
+        }
+        for pos in positions.iter() {
+            let index = pos / 64;
+            let bitshift = pos % 64;
+            let bitmask = 1 << bitshift;
+            usize_vec[index] |= bitmask;
+        }
+        usize_vec
+    }
+
+    #[test]
+    fn internal_tesst_usize_vec_from_positions() {
+        let inputs = vec![15, 37, 78, 96, 107, 128, 131, 192, 255];
+        let one_str = "10000000000000000000001000000000000000";
+        let two_str = "10000000000100000000000000000100000000000000";
+        let three_str = "1001";
+        let four_str = "1000000000000000000000000000000000000000000000000000000000000001";
+        let one = usize::from_str_radix(one_str, 2).unwrap();
+        let two = usize::from_str_radix(two_str, 2).unwrap();
+        let three = usize::from_str_radix(three_str, 2).unwrap();
+        let four = usize::from_str_radix(four_str, 2).unwrap();
+        let expected = vec![one, two, three, four];
+        let actual = usize_vec_from_positions(&inputs);
+        assert_eq!(expected, actual)
     }
 
     #[test]
     fn test_zero_bits_interval_iterator() {
         let expected = vec![2, 14, 9, 21];
-        let usize_input: usize = expected
-            .iter()
-            .rev()
-            .fold(0, |acc, &interval| ((acc << 1) | 1) << interval);
+        let usize_input = usize_from_intervals(&expected);
         let actual: Vec<usize> = ZeroBitsIntervalIterator(usize_input).collect();
 
         assert_eq!(expected, actual)
@@ -345,10 +267,7 @@ mod tests {
     #[test]
     fn test_zero_bits_interval_iterator_trailing_one() {
         let expected = vec![0, 2, 14, 9, 21];
-        let usize_input: usize = expected
-            .iter()
-            .rev()
-            .fold(0, |acc, &interval| ((acc << 1) | 1) << interval);
+        let usize_input = usize_from_intervals(&expected);
         let actual: Vec<usize> = ZeroBitsIntervalIterator(usize_input).collect();
 
         assert_eq!(expected, actual)
@@ -363,10 +282,7 @@ mod tests {
     #[test]
     fn test_zero_bits_interval_iterator_repeating_ones() {
         let expected = vec![0, 0, 0, 2, 0, 14, 0, 0, 0, 9, 21];
-        let usize_input: usize = expected
-            .iter()
-            .rev()
-            .fold(0, |acc, &interval| ((acc << 1) | 1) << interval);
+        let usize_input = usize_from_intervals(&expected);
         let actual: Vec<usize> = ZeroBitsIntervalIterator(usize_input).collect();
 
         assert_eq!(expected, actual)
@@ -375,7 +291,7 @@ mod tests {
     #[test]
     fn test_one_bits_position_iterator() {
         let expected = vec![2, 17, 27, 48];
-        let usize_input: usize = expected.iter().fold(0, |acc, &pos| acc | (1 << pos));
+        let usize_input = usize_from_positions(&expected);
         let actual: Vec<usize> = OneBitsPositionIterator::new(usize_input).collect();
         assert_eq!(expected, actual)
     }
@@ -383,7 +299,7 @@ mod tests {
     #[test]
     fn test_one_bits_position_iterator_trailing_one() {
         let expected = vec![0, 1, 2, 17, 27, 48];
-        let usize_input: usize = expected.iter().fold(0, |acc, &pos| acc | (1 << pos));
+        let usize_input = usize_from_positions(&expected);
         let actual: Vec<usize> = OneBitsPositionIterator::new(usize_input).collect();
         assert_eq!(expected, actual)
     }
