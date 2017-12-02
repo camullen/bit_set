@@ -161,7 +161,7 @@ impl Iterator for OneBitsPositionIterator {
 }
 
 
-struct MultiOneBitsPositionIterator<T>
+pub struct MultiOneBitsPositionIterator<T>
 where
     T: Iterator<Item = usize>,
 {
@@ -174,7 +174,7 @@ impl<T> MultiOneBitsPositionIterator<T>
 where
     T: Iterator<Item = usize>,
 {
-    fn new(iter: T) -> MultiOneBitsPositionIterator<T> {
+    pub fn new(iter: T) -> MultiOneBitsPositionIterator<T> {
         MultiOneBitsPositionIterator {
             iter,
             obp_iter: None,
