@@ -1,5 +1,5 @@
 [package]
-name = "typenum_bitset"
+name = "generic_bitset"
 version = "0.1.0"
 authors = ["Cameron Mullen <cameron.mullen@gmail.com>"]
 description = "A configurable, fixed-length bitset based on typenum and generic-array"
